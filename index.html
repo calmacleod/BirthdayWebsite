@@ -3,10 +3,423 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World</title>
+    <title>3D Kitty Model Viewer</title>
+    <link rel="icon" type="image/png" href="cat.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #00b140;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            overflow-y: auto;
+            min-height: 2000vh;
+        }
+        
+        #container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+        
+        #loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 18px;
+            z-index: 100;
+            text-align: center;
+        }
+        
+        #startOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            z-index: 150;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        #startButton {
+            background: transparent;
+            border: none;
+            color: white;
+            padding: 25px 50px;
+            font-size: 28px;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            border-radius: 20px;
+            cursor: pointer;
+            z-index: 200;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        #startButton::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        #startButton:hover {
+            transform: translateY(-2px);
+            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        }
+        
+        #startButton:hover::before {
+            left: 100%;
+        }
+        
+        #startButton:active {
+            transform: translateY(0);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* Animation classes */
+        .fade-out {
+            opacity: 0 !important;
+            transform: scale(0.9) !important;
+        }
+        
+        .slide-up {
+            transform: translateY(-100vh) !important;
+        }
+        
+        /* Mobile-specific styles */
+        @media (max-width: 768px) {
+            body {
+                min-height: 100vh;
+            }
+            
+            #loading {
+                font-size: 16px;
+            }
+            
+            #startButton {
+                font-size: 22px;
+                padding: 20px 40px;
+                border-radius: 15px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h1>Hello, World!</h1>
-    <p>Welcome to my website!</p>
+    <div id="container"></div>
+    <div id="loading">Loading 3D model...</div>
+    <div id="startOverlay">
+        <button id="startButton">Proceed with Caution</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script>
+        // Audio setup
+        let audioContext = null;
+        let audioBuffer = null;
+        let audioSource = null;
+        let audioGain = null;
+        let isAudioLoaded = false;
+        let isPlaying = false;
+        let audioInitialized = false;
+        let isStarted = false;
+        let audioStartTime = 0;
+        let audioPauseTime = 0;
+        
+        // Function to initialize everything after start button click
+        async function initializeEverything() {
+            if (isStarted) return;
+            
+            // Play the cute animation
+            const startOverlay = document.getElementById('startOverlay');
+            const startButton = document.getElementById('startButton');
+            
+            // First, fade out the button
+            startButton.classList.add('fade-out');
+            
+            // Wait a bit, then slide up the entire overlay
+            setTimeout(() => {
+                startOverlay.classList.add('slide-up');
+            }, 300);
+            
+            // Initialize audio context
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            audioInitialized = true;
+            
+            // Create gain node for volume control
+            audioGain = audioContext.createGain();
+            audioGain.gain.value = 0.3;
+            audioGain.connect(audioContext.destination);
+            
+            // Load the audio file
+            try {
+                const response = await fetch('assets/music/OIIAOIIA.mp3');
+                const arrayBuffer = await response.arrayBuffer();
+                audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                isAudioLoaded = true;
+                console.log('Audio loaded successfully');
+            } catch (error) {
+                console.error('Error loading audio:', error);
+            }
+            
+            // Hide loading
+            document.getElementById('loading').style.display = 'none';
+            
+            isStarted = true;
+            
+            // Start the animation loop
+            animate();
+        }
+        
+        // Function to start/resume audio
+        function startAudio() {
+            if (!audioInitialized || !isAudioLoaded || !audioBuffer || isPlaying) return;
+            
+            try {
+                audioSource = audioContext.createBufferSource();
+                audioSource.buffer = audioBuffer;
+                audioSource.playbackRate.value = 1.0;
+                
+                audioSource.connect(audioGain);
+                
+                audioSource.start(0, audioPauseTime);
+                audioStartTime = audioContext.currentTime - audioPauseTime;
+                isPlaying = true;
+                
+                audioSource.loop = true;
+                
+                console.log('Audio started/resumed');
+            } catch (error) {
+                console.error('Error playing audio:', error);
+            }
+        }
+        
+        // Function to pause audio
+        function pauseAudio() {
+            if (!isPlaying || !audioSource) return;
+            
+            try {
+                audioPauseTime = (audioContext.currentTime - audioStartTime) % audioBuffer.duration;
+                
+                audioSource.stop();
+                audioSource = null;
+                isPlaying = false;
+                
+                console.log('Audio paused at:', audioPauseTime);
+            } catch (error) {
+                console.error('Error pausing audio:', error);
+            }
+        }
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x00b140);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 1.2);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.5);
+        directionalLight.position.set(10, 10, 5);
+        directionalLight.castShadow = true;
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        scene.add(directionalLight);
+
+        const pointLight1 = new THREE.PointLight(0xff6b6b, 2, 100);
+        pointLight1.position.set(5, 5, 5);
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0x4ecdc4, 2, 100);
+        pointLight2.position.set(-5, 5, -5);
+        scene.add(pointLight2);
+
+        const frontLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        frontLight.position.set(0, 0, 10);
+        scene.add(frontLight);
+
+        camera.position.set(0, 1, 3);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enabled = false;
+
+        const loader = new THREE.GLTFLoader();
+        let model;
+        let modelLoaded = false;
+
+        loader.load(
+            'assets/Kitty3DTwo/result.gltf',
+            function (gltf) {
+                model = gltf.scene;
+                modelLoaded = true;
+                
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const scale = 1.5 / maxDim;
+                model.scale.setScalar(scale);
+                
+                model.position.sub(center.multiplyScalar(scale));
+                
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+                
+                scene.add(model);
+                
+                // Show start button when model is loaded
+                document.getElementById('startOverlay').style.display = 'flex';
+                document.getElementById('loading').style.display = 'none';
+                
+                // Start rendering immediately
+                animate();
+            },
+            function (xhr) {
+                const percent = (xhr.loaded / xhr.total * 100).toFixed(0);
+                document.getElementById('loading').textContent = `Loading 3D model... ${percent}%`;
+            },
+            function (error) {
+                console.error('An error occurred loading the model:', error);
+                document.getElementById('loading').textContent = 'Error loading 3D model';
+            }
+        );
+
+        let totalRotation = 0;
+        let lastScrollY = 0;
+        let lastTouchY = 0;
+        let isTouching = false;
+        const scrollSensitivity = 0.0002;
+        
+        let velocity = 0;
+        let lastTouchTime = 0;
+        let lastTouchDelta = 0;
+        const deceleration = 0.99;
+        const minVelocity = 0.001;
+
+        window.addEventListener('scroll', function() {
+            if (!isStarted) return;
+            
+            if (!isTouching) {
+                const currentScrollY = window.scrollY;
+                const scrollDelta = currentScrollY - lastScrollY;
+                
+                totalRotation += scrollDelta * scrollSensitivity;
+                
+                lastScrollY = currentScrollY;
+            }
+        });
+
+        let touchStartY = 0;
+        let touchStartTime = 0;
+
+        document.addEventListener('touchstart', function(event) {
+            if (!isStarted) return;
+            
+            isTouching = true;
+            touchStartY = event.touches[0].clientY;
+            touchStartTime = Date.now();
+            lastTouchY = touchStartY;
+            velocity = 0;
+        }, { passive: true });
+
+        document.addEventListener('touchmove', function(event) {
+            if (!isStarted || !isTouching) return;
+            
+            const currentTouchY = event.touches[0].clientY;
+            const currentTime = Date.now();
+            const touchDelta = currentTouchY - lastTouchY;
+            const timeDelta = currentTime - lastTouchTime;
+            
+            if (timeDelta > 0) {
+                velocity = -touchDelta / timeDelta * scrollSensitivity * 1000;
+            }
+            
+            totalRotation -= touchDelta * scrollSensitivity * 2;
+            
+            lastTouchY = currentTouchY;
+            lastTouchTime = currentTime;
+            lastTouchDelta = touchDelta;
+        }, { passive: true });
+
+        document.addEventListener('touchend', function(event) {
+            if (!isStarted) return;
+            
+            isTouching = false;
+            lastScrollY = window.scrollY;
+        }, { passive: true });
+
+        document.getElementById('startButton').addEventListener('click', initializeEverything);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Always render the scene, even before starting
+            if (modelLoaded && model) {
+                if (isStarted) {
+                    // Only animate rotation if started
+                    if (!isTouching && Math.abs(velocity) > minVelocity) {
+                        totalRotation += velocity;
+                        velocity *= deceleration;
+                    }
+                    
+                    model.rotation.y = totalRotation;
+                    
+                    const rotationSpeed = Math.abs(velocity);
+                    if (rotationSpeed > 0.001) {
+                        if (!isPlaying) {
+                            startAudio();
+                        }
+                    } else {
+                        if (isPlaying) {
+                            pauseAudio();
+                        }
+                    }
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', onWindowResize, false);
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
 </body>
 </html>
