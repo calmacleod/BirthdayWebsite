@@ -107,6 +107,42 @@
             transform: translateY(-100vh) !important;
         }
 
+        #birthdayBanner {
+            position: fixed;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px); /* Start off-screen */
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 15px 30px;
+            color: white;
+            text-align: center;
+            z-index: 151; /* Above container but below start overlay initially */
+            opacity: 0;
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.5s, transform 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.5s;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            pointer-events: none; /* So it doesn't block interactions */
+        }
+
+        #birthdayBanner.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        #birthdayBanner h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 800;
+        }
+
+        #birthdayBanner p {
+            margin: 5px 0 0;
+            font-size: 16px;
+            font-weight: 400;
+        }
+        
         /* Mobile-specific styles */
         @media (max-width: 768px) {
             body {
@@ -122,6 +158,17 @@
                 padding: 20px 40px;
                 border-radius: 15px;
             }
+
+            #birthdayBanner {
+                width: 90%;
+                padding: 10px 20px;
+            }
+            #birthdayBanner h1 {
+                font-size: 22px;
+            }
+            #birthdayBanner p {
+                font-size: 14px;
+            }
         }
     </style>
 </head>
@@ -131,6 +178,10 @@
     <div id="loading">Loading 3D model...</div>
     <div id="startOverlay">
         <button id="startButton">Proceed with Caution</button>
+    </div>
+    <div id="birthdayBanner">
+        <h1>Happy birthday babe</h1>
+        <p>P.S. That is supposed to be kitty</p>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -162,7 +213,10 @@
             setTimeout(() => {
                 startOverlay.classList.add('slide-up');
             }, 300);
-
+            
+            // Show the birthday banner
+            document.getElementById('birthdayBanner').classList.add('visible');
+            
             // Initialize audio context
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             audioInitialized = true;
