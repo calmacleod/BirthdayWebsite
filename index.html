@@ -8,6 +8,9 @@
     <link rel="icon" type="image/png" href="cat.png">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
         body {
             margin: 0;
             padding: 0;
@@ -111,8 +114,6 @@
             position: fixed;
             top: 30px;
             left: 50%;
-            margin-left: 1rem;
-            margin-right: 1rem;
             transform: translateX(-50%) translateY(-100px); /* Start off-screen */
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
@@ -162,7 +163,7 @@
             }
 
             #birthdayBanner {
-                width: 90%;
+                width: calc(100% - 2rem); /* 1rem margin on each side */
                 padding: 10px 20px;
             }
             #birthdayBanner h1 {
