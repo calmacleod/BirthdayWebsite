@@ -1,1 +1,1 @@
-A fun introduction to using Three.js
+A fun introduction to using Three.js to show 3D objects in browser.
